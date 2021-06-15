@@ -26,6 +26,96 @@ describe('bindings', function() {
       expect(fragment).html('hi');
     });
 
+    describe.skip('bracket inner attribute-alias dependency change', function() {
+      it('works without using an alias or attribute', function() {
+        var app = runner.createHarness().app;
+        app.views.register('Body', '<view is="greeting-list" greetingIds="{{_page.greetingIds}}"/>');
+        app.views.register('greeting-list',
+          '{{each _page.greetingIds as #id, #i}}' +
+            '<div>{{_page.greetings[#id]}}</div>' +
+          '{{/each}}');
+        var page = app.createPage();
+        page.model.set('_page.greetings', {
+          hi: 'Hello!',
+          bye: 'Farewell',
+        });
+        page.model.set('_page.greetingIds', ['hi']);
+        var fragment = page.getFragment('Body');
+        expect(fragment).html('<div>Hello!</div>');
+
+        page.model.set('_page.greetingIds.0', 'bye');
+        expect(fragment).html('<div>Farewell</div>');
+      });
+
+      it('breaks using an alias {{with}}', function() {
+        var app = runner.createHarness().app;
+        app.views.register('Body', '<view is="greeting-list"/>');
+        app.views.register('greeting-list',
+          '{{with _page.greetingIds as #greetingIds}}' +
+            '{{each #greetingIds as #id, #i}}' +
+              '<div>{{_page.greetings[#id]}}</div>' +
+            '{{/each}}' +
+          '{{/with}}')
+        var page = app.createPage();
+        page.model.set('_page.greetings', {
+          hi: 'Hello!',
+          bye: 'Farewell',
+        });
+        page.model.set('_page.greetingIds', ['hi']);
+        var fragment = page.getFragment('Body');
+        expect(fragment).html('<div>Hello!</div>');
+
+        page.model.set('_page.greetingIds.0', 'bye');
+        // This would work:
+        // page.model.set('_page.greetingIds', ['bye'])
+        expect(fragment).html('<div>Farewell</div>');
+      });
+
+      it('breaks when using an attribute alias', function() {
+        var app = runner.createHarness().app;
+        app.views.register('Body', '<view is="greeting-list" greetingIds="{{_page.greetingIds}}"/>');
+        app.views.register('greeting-list',
+          '{{each @greetingIds as #id, #i}}' +
+            '<div>{{_page.greetings[#id]}}</div>' +
+          '{{/each}}');
+        var page = app.createPage();
+        page.model.set('_page.greetings', {
+          hi: 'Hello!',
+          bye: 'Farewell',
+        });
+        page.model.set('_page.greetingIds', ['hi']);
+        var fragment = page.getFragment('Body');
+        expect(fragment).html('<div>Hello!</div>');
+
+        page.model.set('_page.greetingIds.0', 'bye');
+        // This would work:
+        // page.model.set('_page.greetingIds', ['bye'])
+        expect(fragment).html('<div>Farewell</div>');
+      });
+
+      it('breaks when using a simple array aliased using {{with}}', function() {
+        var app = runner.createHarness().app;
+        app.views.register('Body', '<view is="greeting-list"/>');
+        app.views.register('greeting-list',
+          '{{with _page.greetings as #greetings}}' +
+            '{{each #greetings as #greeting}}' +
+              '<div>{{#greeting}}</div>' +
+            '{{/each}}' +
+          '{{/with}}')
+        var page = app.createPage();
+        page.model.set('_page.greetings', ['Hello!']);
+        var fragment = page.getFragment('Body');
+        expect(fragment).html('<div>Hello!</div>');
+
+        page.model.set('_page.greetings.0', 'Farewell');
+        // This would work:
+        // page.model.set('_page.greetingIds', ['bye'])
+        expect(fragment).html('<div>Farewell</div>');
+      });
+    });
+
+
+
     it('bracket outer dependency change', function() {
       var app = runner.createHarness().app;
       app.views.register('Body', '{{_page.doc[_page.key]}}');
